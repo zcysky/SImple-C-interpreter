@@ -5,7 +5,7 @@ using namespace std;
 const int ARRAY_LIMIT=65536;
 
 //关键字定义：
-const int INT=_ARRAY_LIMIT-1;
+const int INT=ARRAY_LIMIT-1;
 
 //token的三种类型
 const int IDENT=INT-1;
@@ -35,25 +35,25 @@ const int COMMENT=EXIT-1;
 
 //定义运算符号
 //括号
-const int LC1="(";
-const int RC1=")";
-const int LC2="[";
-const int RC2="]";
-const int BEGIN="{";
-const int END="}";
+const int LC1='(';
+const int RC1=')';
+const int LC2='[';
+const int RC2=']';
+const int BEGIN='{';
+const int END='}';
 
 //双目基本运算
-const int PLUS="+";
-const int MINUS="-";
-const int MUL="*";
-const int DEV="/";
-const int MOD="%";
+const int PLUS='+';
+const int MINUS='-';
+const int MUL='*';
+const int DEV='/';
+const int MOD='%';
 
 //逻辑运算符
-const int NOT="!";
-const int ASSIGN="=";
-const int SEP=";";
-const int LESS="<";
-const int GREAT=">";
+const int NOT='!';
+const int ASSIGN='=';
+const int SEP=';';
+const int LESS='<';
+const int GREAT='>';
 
-#define dbg(x) cout<<#x<<" = "<<(x)<<endl;
+#define dbg(x) cout<<#x<<' = '<<(x)<<endl;
