@@ -18,7 +18,7 @@ class token{
         this->pos=pos;this->type=type;this->number=number;
     }
     inline void output(){
-        if(type=ERROR)cout<<"ERROR"<<endl;
+        if(type==ERROR)cout<<"ERROR"<<endl;
         if(type==IDENT)cout<<"Ident:"<<ident<<endl;
         if(type==NUMBER)cout<<"Number:"<<number<<endl;
         if(type==KEYWORD)cout<<"Keyword:"<<ident<<endl;
