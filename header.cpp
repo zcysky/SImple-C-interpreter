@@ -23,7 +23,7 @@ const int RETURN=ELSE-1;
 const int L_EQ=RETURN-1;
 const int L_LEQ=L_EQ-1;
 const int L_REQ=L_LEQ-1;
-const int L_NEQ=L_LEQ-1;
+const int L_NEQ=L_REQ-1;
 const int L_AND=L_NEQ-1;
 const int L_OR=L_AND-1;
 

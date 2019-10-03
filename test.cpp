@@ -23,7 +23,7 @@ const int RETURN=ELSE-1;
 const int L_EQ=RETURN-1;
 const int L_LEQ=L_EQ-1;
 const int L_REQ=L_LEQ-1;
-const int L_NEQ=L_LEQ-1;
+const int L_NEQ=L_REQ-1;
 const int L_AND=L_NEQ-1;
 const int L_OR=L_AND-1;
 
@@ -235,7 +235,7 @@ class lexer{
         append(L_OR,"||");
 
         append(COMMENT,"//");
-        MakeOpt("+-*/%#()[]{}=!^<>;,");
+        MakeOpt("#+-*/%()[]{}=!^;,<>");
         
         MakeIdent(IDENT);
         MakeNumber(NUMBER);
@@ -244,7 +244,15 @@ class lexer{
 
 }lexer;
 
-
+veoctor<token> tokens;
 int main(){
     lexer.init();
+    freopen("source.cpp");
+    lexer.begin();
+    token cur;
+    do{
+        cur=lexer.read();
+        tokens.push_back(cur);
+        cur.output();
+    }while(cur.type!=EXIT);
 }
