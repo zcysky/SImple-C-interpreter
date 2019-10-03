@@ -168,6 +168,7 @@ class lexer{
         return 0;
     }
     inline token readident(){
+        puts("!!!");
         assert(isalpha(ch)||ch=='_');
         Position now=pos;string cur;
         while(checkid(ch)){cur+=ch;readchar();}
@@ -210,12 +211,13 @@ class lexer{
         else if(isdigit(ch))return readnumber();
         else return readkeyword();
     }
-    inline token skipcomment(){
+    inline token readtoken(){
         token tok=read();
         while(tok.type==COMMENT){
             while(ch!='\n')readchar();
             readchar();tok=read();
-        }  
+        }
+        return tok;
     }
     inline void begin(){skipblank();}
     inline bool iserror(){/*判定是否错误*/}
@@ -244,15 +246,20 @@ class lexer{
 
 }lexer;
 
-veoctor<token> tokens;
+//veoctor<token> tokens;
 int main(){
     lexer.init();
-    freopen("source.cpp");
+    freopen("source.cpp","r",stdin);
     lexer.begin();
     token cur;
+    int cnt=0;
     do{
-        cur=lexer.read();
-        tokens.push_back(cur);
+        cur=lexer.readtoken();
+        cnt++;
+        //tokens.push_back(cur);
         cur.output();
+        cout<<cur.ident<<endl;
+      //  system("PAUSE");
+       // if(cnt==10)return 0;
     }while(cur.type!=EXIT);
 }
