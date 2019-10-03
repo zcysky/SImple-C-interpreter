@@ -115,7 +115,7 @@ class lexer{
 
     public:
     lexer(){ch=' ';pos.line=1;pos.col=0;}
-    inline void append(int id,string &s){//向Lexer中插入语法单元
+    inline void append(int id,const string &s){//向Lexer中插入语法单元
         assert(!keys.count(s));
         assert(!table.count(id));
         table[id]=s;keys[s]=id;
@@ -147,4 +147,27 @@ class lexer{
     }
     inline void begin(){skipblank();}
     inline bool iserror(){/*判定是否错误*/}
-};
+    inline void init(){
+        append(INT,"int");
+        append(FOR,"for");
+        append(WHILE,"while");
+        append(ELSE,"return");
+        append(IF,"if");
+        append(RETURN,"return");
+        
+        append(L_EQ,"==");
+        append(L_LEQ,"<=");
+        append(L_REQ,">=");
+        append(L_NEQ,"!=");
+        append(L_AND,"&&");
+        append(L_OR,"||");
+
+        append(COMMENT,"//");
+        MakeOpt("+-*/%#()[]{}=!^<>;,");
+        
+        MakeIdent(IDENT);
+        MakeNumber(NUMBER);
+        MakeError(ERROR);
+    }
+
+}lexer;
