@@ -82,6 +82,7 @@ class token{
     token(){}
     token(Position pos,int type,const string &ident){
         this->pos=pos;this->type=type;this->ident=ident;
+        cout<<this->type<<endl;
     }
     token(Position pos,int type){
         this->pos=pos;this->type=type;
@@ -90,7 +91,7 @@ class token{
         this->pos=pos;this->type=type;this->number=number;
     }
     inline void output(){
-        if(type=ERROR)cout<<"ERROR"<<endl;
+        if(type==ERROR)cout<<"ERROR"<<endl;
         if(type==IDENT)cout<<"Ident:"<<ident<<endl;
         if(type==NUMBER)cout<<"Number:"<<number<<endl;
         if(type==KEYWORD)cout<<"Keyword:"<<ident<<endl;
@@ -146,7 +147,8 @@ class lexer{
         else return 0;
     }
     inline void skipblank(){
-        do{readchar();}while(isblank(ch));
+        assert(isblank(ch));
+        while(isblank(ch))readchar();
     }
     inline token readnumber(){
         assert(isdigit(ch));
@@ -168,7 +170,6 @@ class lexer{
         return 0;
     }
     inline token readident(){
-        puts("!!!");
         assert(isalpha(ch)||ch=='_');
         Position now=pos;string cur;
         while(checkid(ch)){cur+=ch;readchar();}
@@ -252,14 +253,8 @@ int main(){
     freopen("source.cpp","r",stdin);
     lexer.begin();
     token cur;
-    int cnt=0;
     do{
         cur=lexer.readtoken();
-        cnt++;
-        //tokens.push_back(cur);
         cur.output();
-        cout<<cur.ident<<endl;
-      //  system("PAUSE");
-       // if(cnt==10)return 0;
     }while(cur.type!=EXIT);
 }
