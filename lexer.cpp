@@ -1,5 +1,6 @@
 #include "debugger.cpp"
 #include "header.cpp"
+#include "reporterror.cpp"
 
 class token{
     public:
@@ -62,6 +63,8 @@ class lexer{
     map<string,int> prefix;
     //暂时存储前缀，之后用Trie代替
 
+    reporter reporters;//报错
+
     //本部分函数调用频率大，使用inline加速调用效率
     inline void readchar(){
         ch=getchar();
@@ -84,7 +87,10 @@ class lexer{
             while(isdigit(ch)){val=val*10+ch-'0';readchar();}
         }
         else{
-            readchar();if(isdigit(ch)){/*返回错误：数字的开头不能为0*/}
+            readchar();if(isdigit(ch)){
+                reporters.issue(HavePreviousZero(pos));
+                //报错：数字有前导0
+            }
         }
         return token(now,NUMBER,val);
     }
@@ -106,7 +112,7 @@ class lexer{
         Position now=pos;string cur;
         while(prefix.count(cur+ch)){cur+=ch;readchar();}
         if(cur==""){
-            //抛出错误：未定义标识符。
+            reporters.issue(UndefinedIdent(pos));//报错：未定义标识符
             while(!isblank(ch))readchar();
             return token(now,ERROR,cur);
         }
@@ -138,20 +144,21 @@ class lexer{
         else if(isdigit(ch))return readnumber();
         else return readkeyword();
     }
-    inline token skipcomment(){
+    inline token readtoken(){
         token tok=read();
         while(tok.type==COMMENT){
             while(ch!='\n')readchar();
             readchar();tok=read();
-        }  
+        }
+        return tok;
     }
     inline void begin(){skipblank();}
-    inline bool iserror(){/*判定是否错误*/}
+    inline bool iserror(){return reporters.haserror();}
     inline void init(){
         append(INT,"int");
         append(FOR,"for");
         append(WHILE,"while");
-        append(ELSE,"return");
+        append(ELSE,"else");
         append(IF,"if");
         append(RETURN,"return");
         

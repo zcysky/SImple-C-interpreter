@@ -8,7 +8,7 @@ class Position{
     Position (int line,int col){
         this->line=line;this->col=col;
     }
-    friend void report(){
+    void report(){
         cerr<<"Line: "<<this->line<<",col: "<<this->col;
     }
 };

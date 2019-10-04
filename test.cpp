@@ -73,6 +73,58 @@ class Position{
     }
 };
 
+class errors{
+
+    public:
+    Position pos;
+    virtual void print()const =0;
+
+
+};
+class reporter{
+
+    bool iserror;
+    public:
+    reporter(){iserror=0;}
+    inline void issue(const errors &cur){cur.print();iserror=1;}
+    inline bool haserror(){return iserror;}
+
+};
+
+class killprocess:public reporter{
+//RE的报错
+    public:
+    killprocess(){}
+    inline void issue(const errors &cur){
+        cerr<<"-------Run-Time-Error:The process has been halted.-----------"<<endl;
+        cur.print();
+        cerr<<"-------------------------------------------------------------"<<endl;
+        exit(1);
+    }
+}killprocess;
+
+
+class HavePreviousZero:public errors{
+
+//报错：数字开头有前导0
+    public:
+    HavePreviousZero(const Position &pos){this->pos=pos;}
+    virtual void print()const{
+        cerr<<"Syntex Error: Number cannot have previous zeros.at Line:"<<pos.line<<",col:"<<pos.col<<endl;
+    }
+};
+
+class UndefinedIdent:public errors{
+
+    public:
+    UndefinedIdent(const Position &pos){this->pos=pos;}
+    virtual void print()const{
+        cerr<<"Syntex Error:Have a undefined ident/keyword.at Line"<<pos.line<<",col:"<<pos.col<<endl;
+    }
+};
+
+
+
 class token{
     public:
     Position pos;//追踪位置，用于报错
@@ -82,7 +134,6 @@ class token{
     token(){}
     token(Position pos,int type,const string &ident){
         this->pos=pos;this->type=type;this->ident=ident;
-        cout<<this->type<<endl;
     }
     token(Position pos,int type){
         this->pos=pos;this->type=type;
@@ -135,6 +186,8 @@ class lexer{
     map<string,int> prefix;
     //暂时存储前缀，之后用Trie代替
 
+    reporter reporters;//报错
+
     //本部分函数调用频率大，使用inline加速调用效率
     inline void readchar(){
         ch=getchar();
@@ -147,8 +200,7 @@ class lexer{
         else return 0;
     }
     inline void skipblank(){
-        assert(isblank(ch));
-        while(isblank(ch))readchar();
+        do{readchar();}while(isblank(ch));
     }
     inline token readnumber(){
         assert(isdigit(ch));
@@ -158,7 +210,10 @@ class lexer{
             while(isdigit(ch)){val=val*10+ch-'0';readchar();}
         }
         else{
-            readchar();if(isdigit(ch)){/*返回错误：数字的开头不能为0*/}
+            readchar();if(isdigit(ch)){
+                reporters.issue(HavePreviousZero(pos));
+                //报错：数字有前导0
+            }
         }
         return token(now,NUMBER,val);
     }
@@ -180,7 +235,7 @@ class lexer{
         Position now=pos;string cur;
         while(prefix.count(cur+ch)){cur+=ch;readchar();}
         if(cur==""){
-            //抛出错误：未定义标识符。
+            reporters.issue(UndefinedIdent(pos));//报错：未定义标识符
             while(!isblank(ch))readchar();
             return token(now,ERROR,cur);
         }
@@ -221,12 +276,12 @@ class lexer{
         return tok;
     }
     inline void begin(){skipblank();}
-    inline bool iserror(){/*判定是否错误*/}
+    inline bool iserror(){return reporters.haserror();}
     inline void init(){
         append(INT,"int");
         append(FOR,"for");
         append(WHILE,"while");
-        append(ELSE,"else");
+        append(ELSE,"ELSE");
         append(IF,"if");
         append(RETURN,"return");
         
@@ -238,7 +293,7 @@ class lexer{
         append(L_OR,"||");
 
         append(COMMENT,"//");
-        MakeOpt("#+-*/%()[]{}=!^;,<>");
+        MakeOpt("+-*/%#()[]{}=!^<>;,");
         
         MakeIdent(IDENT);
         MakeNumber(NUMBER);
@@ -246,6 +301,7 @@ class lexer{
     }
 
 }lexer;
+
 
 //veoctor<token> tokens;
 int main(){
