@@ -211,3 +211,40 @@ class Expr:public AST{
 
 };
 
+class BinaryOpt:public Expr{
+
+    string ident;
+    int type;
+    AST *ls,*rs;
+    BinaryOpt(const Position &pos,const string &ident,const int type,AST *ls,AST *rs){
+        setpos(pos);
+        this->ident=ident;this->type=type;
+        this->ls=ls;this->rs=rs;
+    }
+    ~BinaryOpt(){
+        if(ls!=nullptr)delete(ls);
+        if(rs!=nullptr)delete(rs);
+    }
+    virtual void visit(visitor &vis){vis.VisitBinartOpt(this);}
+    virtual void print(){
+        printf("BinaryOpt: ");
+        cout<<ident<<endl;
+        if(ls!=nullptr)ls->print();else puts("<empty ls>");
+        if(rs!=nullptr)rs->print();else puts("<empty rs>");
+    }
+};
+
+
+class Ident:public Expr{
+
+    public:
+    int data,type;
+    string name;
+    Var var;
+    Ident(const Position &pos,int data){
+        setpos(pos);
+        this->data=data;type=INT;
+    }
+    
+
+}
