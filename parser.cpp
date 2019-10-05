@@ -426,3 +426,60 @@ class Return:public AST{
 };
 
 
+//scope部分
+
+const int GLOBAL=-2;
+template <typename T>
+
+class Scope{
+    map<string,pair<T,int> >table;
+    int id;
+
+    public:
+    Scope(){id=0;}
+    inline bool count(const string &s){return table.count(s);}
+    inline pair<T,int> find(const string &s){
+        assert(table.count(s));
+        return table[s];
+    }
+    inline int create(const string &s,const T &var,int len=1){
+        assert(!table.count(s));
+        table[s]=make_pair(var,id);
+        id+=len;
+        return id-len;
+    }
+    inline int size(){return id;}
+
+};
+
+class ScopeStack{
+
+    vector<Scope<Var> >stack;
+    int id,maxsize;
+
+    public:
+    ScopeStack(){id=0;maxsize=0;}
+    inline void init(){stack.push_back(Scope<Var> ());}
+    inline int topsize(){return stack[stack.size()-1].size();}
+    inline void close(){
+        id-=stack[stack.size()-1].size();
+        stack.pop_back();
+    }
+    inline int count(const string &s,bool through=1){
+        if(!through)return stack[stack.size()-1].count(s);
+        for(int i=stack.size()-1;~i;i--)if(stack[i].count(s))return 1;
+        return 0;
+    }
+    inline pair<pair<Var,int>,int> find(const string &s){
+        assert(count(s));
+        for(int i=stack.size()-1;~i;i--)if(stack[i].count(s))return make_pair(stack[i].find(s),i==0?GLOBAL:stack.size()-1);
+    }
+    inline int create(const string &s,const Var &var,int len=1){
+        id+=len;
+        maxsize=max(maxsize,id);
+        return stack[stack.size()-1].create(s,var,len);
+    }
+    inline int size(){return maxsize;}
+
+}scopeStack;
+
