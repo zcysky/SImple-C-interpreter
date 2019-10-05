@@ -2,6 +2,8 @@
 #include "header.cpp"
 #include "reporterror.cpp"
 #include "lexer.cpp"
+#include<bits/stdc++.h>
+using namespace std;
 
 class AST;
 class VarDefiniton;
@@ -615,3 +617,211 @@ class TypeVisitor:public visitor{
     inline int size(){return stack.topsize();}
 
 }typevisitor;
+
+
+class SemiValue{
+
+    public:
+    int pos,ret;
+    SemiValue(){pos=0;ret=0;}
+    SemiValue(int ret,int pos){
+        this->ret=ret;this->pos=pos;
+    }
+
+};
+
+class runvisitor:public visitor{
+
+    vector<int> pool;
+    int top,ret;
+    struct state{
+        int ret,flag;
+        state(){ret=0;flag=0;}
+    };
+    vector<state> stack;
+    vector<int> index;
+    SemiValue value;
+    inline state& tope(){
+        return stack[stack.size()-1];
+    }
+    inline void init(){index.push_back(top);}
+    inline void close(){
+        top=index[index.size()-1];
+        index.pop_back();
+    }
+    inline int GetStackPos(int idscope,int inscope){
+        if(idscope==GLOBAL)return inscope;
+        return index[index.size()-1-idscope]+inscope;
+    }
+    inline void newfunciton(){
+        stack.push_back(state());
+    }
+    inline void killfuncion(){
+        stack.pop_back();
+    }
+    inline void execfunction(FuncDefinition *func,int *argv,size_t len){
+        init();newfunciton();
+        top+=func->size;
+        pool.resize(top);
+        size_t cnt=min(func->size,len);
+        for(int i=0;i<cnt;i++)pool[GetStackPos(func->argv[i].idscope,func->argv[i]->inscope)]=argv[i];
+        func->stmt->visit(*this);
+        value=SemiValue(tope().ret,-1);
+        killfuncion();
+        close();
+    }
+    public:
+    virtual void visitTopLevel(TopLevel *that){
+        init();
+        for(int i=0;i<that->levels.size();i++)that->levels[i]->visit(*this);
+        close();
+    }
+    virtual void visitVarDefiniton(VarDefiniton *that){
+        if(!stack.empty()&&tope().flag)return;
+        top+=that->size;
+        pool.resize(top);
+    }
+    virtual void visitFuncDefinition(FuncDefinition *that){
+        if(that->ismain){
+            int *array;
+            execfunction(that,array,0);
+        }
+    }
+    virtual void visitBlock(Block *that){
+        if(!stack.empty()&&tope().flag)return;
+        init();
+        for(int i=0;i<that->levels.size();i++)that->levels[i]->visit(*this);
+        close();
+    }
+    virtual void visitBinaryOpt(BinaryOpt *that){
+        if(!stack.empty()&&tope().flag)return;
+        SemiValue lc,rc;
+        that->ls->visit(*this);
+        lc=value;
+        that->rs->visit(*this);
+        rc=value;
+        switch (that->type)
+        {
+        case '=':
+            value=SemiValue(rc.ret,lc.pos);
+            pool[lc.pos]=rc.ret;
+            break;
+        case '^':
+            value=SemiValue(lc.ret^rc.ret,-1);
+            break;
+        case '%':
+            value=SemiValue(lc.ret%rc.ret,-1);
+            break;
+        case '!':
+            value=SemiValue(!rc.ret,-1);
+            break;
+        case '+':
+            value=SemiValue(lc.ret+rc.ret,-1);
+            break;
+        case '-':
+            value=SemiValue(lc.ret-rc.ret,-1);
+            break;
+        case '*':
+            value=SemiValue(lc.ret*rc.ret,-1);
+            break;
+        case '/':
+            value=SemiValue(lc.ret/rc.ret,-1);
+            break;
+        case '<':
+            value=SemiValue(lc.ret<rc.ret,-1);
+            break;
+        case '>':
+            value=SemiValue(lc.ret>rc.ret,-1);
+            break;
+        case L_EQ:
+            value=SemiValue(lc.ret==rc.ret,-1);
+            break;
+        case L_LEQ:
+            value=SemiValue(lc.ret<=rc.ret,-1);
+            break;
+        case L_REQ:
+            value=SemiValue(lc.ret>=rc.ret,-1);
+            break;
+        case L_NEQ:
+            value=SemiValue(lc.ret!=rc.ret,-1);
+            break;
+        case L_AND:
+            value=SemiValue(lc.ret&&rc.ret,-1);
+            break;
+        case L_OR:
+            value=SemiValue(lc.ret||rc.ret,-1);
+            break;
+        default:
+            assert(false);
+            break;
+        }
+    }
+
+    virtual void visitIdent(Ident *that){
+        if(!stack.empty()&&tope().flag)return;
+        int cur;
+        switch (that->type)
+        {
+        case INT:
+            value=SemiValue(that->data,-1);
+            break;
+        case KEYWORD:
+            cur=GetStackPos(that->var.idscope,that->var->inscope);
+            value=SemiValue(pool[cur],cur);
+            break;
+        default:
+            value=SemiValue(0,-2);
+            break;
+        }
+    }
+    virtual void visitExec(Exec *that){
+        if(!stack.empty()&&tope().flag)return;
+        int argv[that->argv.size()];
+        for(int i=0;i<that->argv.size();i++){
+            that->argv[i]->visit(*this);
+            argv[i]=value.ret;
+        }
+        execfunction(that->func,argv,that->argv.size());
+    }
+    virtual void visitArrayOpt(ArrayOpt *that){
+        if(!stack.empty()&&tope().flag)return;
+        int indexs[that->at.size()];
+        for(int i=0;i<that->at.size();i++){
+            that->at[i].visit(*this);
+            indexs[i]=value.ret;
+        }
+        int cur=GetStackPos(that->idscope,that->insocope)+that->var.GetArrayPos(indexs,that->at.size());
+        value=SemiValue(pool[cur],cur);
+    }
+    virtual void visitIf(If *that){
+        if(!stack.empty()&&tope().flag)return;
+        that->expr->visit(*this);
+        if(value.ret){
+            if(that->TrueBrench!=nullptr)that->TrueBrench->visit(*this);
+        }
+        else{
+            if(that->FalseBrench!=nullptr)that->FalseBrench->visit(*this);
+        }
+    }
+    virtual void visitWhile(While *that){
+        if(!stack.empty()&&tope().flag)return;
+        while(that->expr->visit(*this),value.ret)that->stmt->visit(*this);
+    }
+    virtual void visitFor(For *that){
+        if(!stack.empty()&&tope().flag)return;
+        init();
+        if(that->init!=nullptr)that->init->visit(*this);
+        for(;that->expr!=nullptr&&(that->expr->visit(*this),value.ret);that->delta->visit(*this))
+            that->stmt->visit(*this);
+        close();
+    }
+    virtual void visitReturn(Return *that){
+        if(!stack.empty()&&tope().flag)return;
+        that->expr->visit(*this);
+        tope().flag=1;
+        tope().ret=value.ret;
+    }
+
+}runvisitor;
+
+
