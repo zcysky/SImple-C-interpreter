@@ -1,5 +1,6 @@
 #include "debugger.cpp"
 #include "header.cpp"
+#include "reporterror.cpp"
 #include "lexer.cpp"
 
 class AST;
@@ -173,6 +174,7 @@ class FuncDefinition:public AST{
 
 class Block:public AST{
 
+    public:
     vector<AST*> levels;
     Block(const Position &pos,const vector<AST*> levels){
         setpos(pos);
@@ -218,6 +220,7 @@ class Expr:public AST{
 
 class BinaryOpt:public Expr{
 
+    public:
     string ident;
     int type;
     AST *ls,*rs;
@@ -408,6 +411,7 @@ class For:public AST{
 
 class Return:public AST{
 
+    public:
     AST* expr;
     Return(const Position &pos,AST *expr){
         setpos(pos);
@@ -483,3 +487,131 @@ class ScopeStack{
 
 }scopeStack;
 
+//type-visitor:
+//用于查看变量，以及输出AST
+
+class TypeVisitor:public visitor{
+    
+    ScopeStack stack;
+    reporter report;
+    Scope<FuncDefinition*> FunctionScope;
+    inline void newVar(const Position &pos,Var &cur){
+        if(stack.count(cur.name,0)){
+            report.issue(Vardefined(pos,cur.name));
+        }
+        else{
+            if(cur.type!="array"){
+                cur.leftvalue=1;
+                cur.inscope=stack.create(cur.name,cur);
+                cur.idscope=0;
+            }
+            else{
+                cur.leftvalue=0;
+                cur.inscope=stack.create(cur.name, cur ,cur.size);
+                cur.idscope=0;
+            }
+        }
+    }
+    inline void useVar(const Position &pos,Var &cur){
+        if(!stack.count(cur.name)){
+            report.issue(IdentNotDefined(pos,cur.name));
+        }
+        else{
+            pair<pair<Var,int>,int> v=stack.find(cur.name);
+            if(v.first.first.type=="array"){report.issue(ArrayInExpr(pos,cur.name));}
+            else{
+                cur.idscope=v.second;
+                cur.inscope=v.first.second;
+            }
+        }
+    }
+    inline void useArray(const Position &pos,const string &name,ArrayOpt* aopt){
+        if(!stack.count(name)){report.issue(IdentNotDefined(pos,name));}
+        else{
+            pair<pair<Var,int>,int> v=stack.find(name);
+            if(v.first.first.type!="array")report.issue(VariableNotArray(pos,name));
+            else if(aopt->at.size()!=v.first.first.indexs.size())report.issue(ArrayLengthExceed(pos,name));
+            else{
+                aopt->idscope=v.second;
+                aopt->insocope=v.first.second;
+                aopt->var=v.first.first;
+            }
+        }
+    }
+
+    public:
+    virtual void visitAST(AST *that){assert(false);}
+    virtual void visitTopLevel(TopLevel *that){
+        stack.init();
+        for(int i=0;i<that->levels.size();i++)that->levels[i]->visit(*this);
+        stack.close();
+    }
+    virtual void visitVarDefinition(VarDefiniton *that){
+        that->size=0;
+        for(int i=0;i<that->vars.size();i++){
+            newVar(that->getpos(),that->vars[i]);
+            that->size+=that->vars[i]->size;
+        }
+    }
+    virtual void visitFuncDefinition(FuncDefinition *that){
+        if(FunctionScope.count(that->name))report.issue(FuncDefined(that->getpos(),that->name));
+        else{
+            FunctionScope.create(that->name,that);
+            stack.init();
+            for(int i=0;i<that->argv.size();i++)newVar(that->getpos(),that->argv[i]);
+            if(that->stmt!=nullptr)that->stmt->visit(*this);
+            stack.close();
+        }
+
+    }
+    virtual void visitBlock(Block *that){
+        stack.init();
+        for(int i=0;i<that->levels.size();i++)that->levels[i]->visit(*this);
+        stack.close();
+
+    }
+    virtual void visitIf(If *that){
+        that->expr->visit(*this);
+        if(that->TrueBrench!=nullptr)that->TrueBrench->visit(*this);
+        if(that->FalseBrench!=nullptr)that->FalseBrench->visit(*this);
+    }
+    virtual void visitWhile(While *that){
+        that->expr->visit(*this);
+        if(that->stmt!=nullptr)that->stmt->visit(*this);
+    }
+    virtual void visitFor(For *that){
+        stack.init();
+        if(that->init!=nullptr)that->init->visit(*this);
+        if(that->expr!=nullptr)that->expr->visit(*this);
+        if(that->delta!=nullptr)that->delta->visit(*this);
+        if(that->stmt!=nullptr)that->stmt->visit(*this);
+        stack.close();
+    }
+    virtual void visitReturn(Return *that){
+        that->expr->visit(*this);
+    }
+    virtual void visitBinaryOpt(BinaryOpt *that){
+        that->ls->visit(*this);
+        that->rs->visit(*this);
+    }
+    virtual void visitIdent(Ident *that){
+        if(that->type==KEYWORD){
+            that->var=Var("int",that->name);
+            useVar(that->getpos(),that->var);
+        }
+    }
+    virtual void visitExec(Exec *that){
+        if(!FunctionScope.count(that->name))report.issue(IdentNotDefined(that->getpos(),that->name));
+        else that->func=FunctionScope.find(that->name).first;
+        for(int i=0;i<that->argv.size();i++)that->argv[i]->visit(*this);
+    }
+    virtual void visitArrayopt(ArrayOpt *that){
+        useArray(that->getpos(),that->name,that);
+        for(int i=0;i<that->at.size();i++)that->at[i]->visit(*this);
+    }
+    inline bool iserror(){
+        return report.haserror();
+    }
+    inline int size(){return stack.topsize();}
+
+}typevisitor;

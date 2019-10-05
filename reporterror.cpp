@@ -51,3 +51,121 @@ class UndefinedIdent:public errors{
         cerr<<"Syntex Error:Have a undefined ident/keyword.at Line"<<pos.line<<",col:"<<pos.col<<endl;
     }
 };
+
+
+class Vardefined:public errors{
+
+    string name;
+    public:
+    Vardefined(const Position &pos,const string &name){
+        this->pos=pos;
+        this->name=name;
+    }
+    virtual void print()const{
+        cerr<<"Syntex Error:Variable has been defined before.at Line"<<pos.line<<",col:"<<pos.col<<endl;
+    }
+
+
+};
+
+class IdentNotDefined:public errors{
+
+    string name;
+    public:
+    IdentNotDefined(const Position &pos,const string &name){
+        this->pos=pos;
+        this->name=name;
+    }
+    virtual void print()const{
+        cerr<<"Syntex Error:Function or Variable hasn't been defined.at Line:"<<pos.line<<",col:"<<pos.col<<endl;
+    }
+
+
+};
+
+class ArrayInExpr:public errors{
+
+    string name;
+    public:
+    ArrayInExpr(const Position &pos,const string &name){
+        this->pos=pos;this->name=name;
+    }
+    virtual void print()const{
+        cerr<<"Syntex Error:A expression includes an array.at Line: "<<pos.line<<",col:"<<pos.col<<endl;
+    }
+
+};
+
+class SyntexError:public errors{
+
+    public:
+    SyntexError(const Position &pos){
+        this->pos=pos;
+    }
+    virtual void print()const{
+        cerr<<"Syntex Error At Line: "<<pos.line<<",col:"<<pos.col<<endl;
+    }
+
+};
+
+class SegmentError:public errors{
+
+    public:
+    SegmentError(const Position &pos){this->pos=pos;}
+    virtual void print()const{
+        cerr<<"Segment Fault At line: "<<pos.line<<",col:"<<pos.col<<endl;
+    }    
+
+};
+
+class BadArrayOpt:public errors{
+
+    public:
+    BadArrayOpt(){}
+    virtual void print()const{
+        cerr<<"Bad Array Operation."<<endl;
+    }
+
+};
+
+class FuncDefined:public errors{
+
+    string name;
+    public:
+    FuncDefined(const Position &pos,const string &name){
+        this->pos=pos;
+        this->name=name;
+    }
+    virtual void print()const{
+        cerr<<"Syntex Error:Function has been defined before.At line:"<<pos.line<<",col:"<<pos.col<<endl;
+    }
+
+};
+
+class VariableNotArray:public errors{
+
+    string name;
+    public:
+    VariableNotArray(const Position &pos,const string &name){
+        this->pos=pos;
+        this->name=name;
+    }
+    virtual void print()const{
+        cerr<<"Syntex Error:Variable is not an array.At line: "<<pos.line<<",col="<<pos.col<<endl;
+    }
+
+};
+
+class ArrayLengthExceed:public errors{
+
+    string name;
+    public:
+    ArrayLengthExceed(const Position &pos,const string &name){
+        this->pos=pos;
+        this->name=name;
+    }
+    virtual void print()const{
+        cerr<<"Syntex Error:Array Length exceed.At line:"<<pos.line<<",col="<<pos.col<<endl;
+    }
+
+};
