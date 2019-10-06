@@ -531,7 +531,7 @@ class Var{
     inline void print(int tab){
         for(int i=1;i<=tab;i++)putchar(' ');
         cout<<type<<" "<<name<<endl;
-        if(type=="array")for(int i=0;i<indexs.size();i++)cout<<name<<"["<<indexs[i]<<"] ";
+        if(type=="array")for(int i=0;i<indexs.size();i++)cout<<"["<<indexs[i]<<"] ";
     }
 
     
@@ -704,7 +704,7 @@ class ArrayOpt:public Expr{
     int idscope,insocope;
     vector<AST*> at;
     Var var;
-    ArrayOpt(const Position &pos,const string &name,const vector<AST*> at){
+    ArrayOpt(const Position &pos,const string &name,const vector<AST*> &at){
         setpos(pos);
         this->name=name;this->at=at;
     }
@@ -871,7 +871,7 @@ class Scope{
         return table[s];
     }
     inline int create(const string &s,const T &var,int len=1){
-        assert(!table.count(s));
+        assert(!count(s));
         table[s]=make_pair(var,id);
         id+=len;
         return id-len;
@@ -1734,7 +1734,7 @@ class parser{
         }
     }
 
-    void calc(vector<AST*> exprs){
+    void calc(vector<AST*> &exprs){
         Position pos=lookahead().pos;
         switch(lookahead().type){
 		case ')':
@@ -1772,9 +1772,9 @@ class parser{
         do{
             cur=lexer.readtoken();
             tokens.push_back(cur);
-            //cur.output(); 
+            cur.output(); 
         }
-        while(cur.type!=EOF);
+        while(cur.type!=EXIT);
         if(lexer.iserror())exit(0);
         program=head();
         program->visit(typevisitor);

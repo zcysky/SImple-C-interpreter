@@ -1305,7 +1305,7 @@ class parser{
         }
     }
 
-    void calc(vector<AST*> exprs){
+    void calc(vector<AST*> &exprs){
         Position pos=lookahead().pos;
         switch(lookahead().type){
 		case ')':
