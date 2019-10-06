@@ -31,6 +31,8 @@ const int L_OR=L_AND-1;
 const int ERROR=L_OR-1;
 const int EXIT=ERROR-1;
 const int COMMENT=EXIT-1;
+const int SHIFTL=COMMENT-1;
+const int SHIFTR=SHIFTL-1;
 
 
 //定义运算符号
