@@ -1,7 +1,3 @@
-#include "debugger.cpp"
-#include<bits/stdc++.h>
-using namespace std;
-
 class errors{
 
     public:
@@ -104,6 +100,7 @@ class SyntexError:public errors{
     }
     virtual void print()const{
         cerr<<"Syntex Error At Line: "<<pos.line<<",col:"<<pos.col<<endl;
+        exit(0);
     }
 
 };

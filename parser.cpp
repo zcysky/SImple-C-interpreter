@@ -1,10 +1,3 @@
-#include "debugger.cpp"
-#include "header.cpp"
-#include "reporterror.cpp"
-#include "lexer.cpp"
-#include<bits/stdc++.h>
-using namespace std;
-
 class AST;
 class VarDefiniton;
 class FuncDefinition;
@@ -63,7 +56,7 @@ class Var{
         int size=1;
         for(int i=0;i<indexs.size();i++){
             int v=indexs[i];
-            if(v<0||!checkmul(size,v)){/*报错：数组下标越界*/}
+            if(v<0||!checkmul(size,v)){killprocess.issue(BadArrayOpt());}
             size*=v;
         }
         return size;
@@ -216,7 +209,7 @@ class TopLevel:public AST{
 class Expr:public AST{
 
     virtual void visit(visitor &vis)=0;
-    virtual void print()=0;
+    virtual void print(int tab)=0;
 
 };
 
@@ -226,7 +219,7 @@ class BinaryOpt:public Expr{
     string ident;
     int type;
     AST *ls,*rs;
-    BinaryOpt(const Position &pos,const string &ident,const int type,AST *ls,AST *rs){
+    BinaryOpt(const Position &pos,const int type,const string &ident,AST *ls,AST *rs){
         setpos(pos);
         this->ident=ident;this->type=type;
         this->ls=ls;this->rs=rs;
@@ -552,7 +545,7 @@ class TypeVisitor:public visitor{
         that->size=0;
         for(int i=0;i<that->vars.size();i++){
             newVar(that->getpos(),that->vars[i]);
-            that->size+=that->vars[i]->size;
+            that->size+=that->vars[i].size;
         }
     }
     virtual void visitFuncDefinition(FuncDefinition *that){
@@ -663,8 +656,8 @@ class runvisitor:public visitor{
         init();newfunciton();
         top+=func->size;
         pool.resize(top);
-        size_t cnt=min(func->size,len);
-        for(int i=0;i<cnt;i++)pool[GetStackPos(func->argv[i].idscope,func->argv[i]->inscope)]=argv[i];
+        size_t cnt=min(func->size,(int)len);
+        for(int i=0;i<cnt;i++)pool[GetStackPos(func->argv[i].idscope,func->argv[i].inscope)]=argv[i];
         func->stmt->visit(*this);
         value=SemiValue(tope().ret,-1);
         killfuncion();
@@ -766,7 +759,7 @@ class runvisitor:public visitor{
             value=SemiValue(that->data,-1);
             break;
         case KEYWORD:
-            cur=GetStackPos(that->var.idscope,that->var->inscope);
+            cur=GetStackPos(that->var.idscope,that->var.inscope);
             value=SemiValue(pool[cur],cur);
             break;
         default:
@@ -787,7 +780,7 @@ class runvisitor:public visitor{
         if(!stack.empty()&&tope().flag)return;
         int indexs[that->at.size()];
         for(int i=0;i<that->at.size();i++){
-            that->at[i].visit(*this);
+            that->at[i]->visit(*this);
             indexs[i]=value.ret;
         }
         int cur=GetStackPos(that->idscope,that->insocope)+that->var.GetArrayPos(indexs,that->at.size());
@@ -825,3 +818,543 @@ class runvisitor:public visitor{
 }runvisitor;
 
 
+//parser主体部分
+
+class parser{
+
+    vector<token> tokens;
+    reporter report;
+    int pre;
+    AST *program;
+
+    inline token lookahead(){
+        return tokens[pre];
+    }
+    inline void match(int id){
+        if(pre==-1)return;
+        else if(pre>tokens.size()){
+            report.issue(SyntexError(tokens[tokens.size()-1].pos));
+            pre=-1;
+        }
+        else if(tokens[pre].type!=id)report.issue(SyntexError(tokens[pre].pos));
+        else pre++;
+    }
+
+    public:
+
+
+    AST* head(){
+        return toplevel();
+    }
+    AST* toplevel(){
+        AST *tmp=nullptr;
+        vector<AST*> argv;
+        Position pos=lookahead().pos;
+        while(true){
+            switch (lookahead().type)
+            {
+            case EXIT:
+                match(EXIT);
+                return new TopLevel(pos,argv);
+                break;
+            case INT:
+                match(INT);
+                break;
+            default:
+                killprocess.issue(SyntexError(lookahead().pos));
+                break;
+            }
+            argv.push_back(idents());
+        }
+        
+    }
+
+    AST* idents(){
+        string name=lookahead().ident;
+        Position pos=lookahead().pos;
+        vector<Var> opt;
+        AST* Tree;
+        match(IDENT);
+        switch (lookahead().type){
+            case '(':
+                Tree=funcdef(opt);
+                return new FuncDefinition(pos,name,opt,Tree);
+            case ',':
+            case ';':
+            case '[':
+                vardef(name,opt);
+                varsdef(opt);
+                match(';');
+                return new VarDefiniton(pos,opt);
+            default:
+            killprocess.issue(SyntexError(lookahead().pos));
+        }
+        assert(false);
+    }
+
+    void parmas(vector<Var> &opt){
+        string name;
+        if(lookahead().type==INT){
+            match(INT);
+            name=lookahead().ident;
+            match(IDENT);
+            opt.push_back(Var("int",name));
+            if(lookahead().type==','){match(',');parmas(opt);}
+        }
+    }
+    AST* funcdef(vector<Var> &opt){
+        match('(');parmas(opt);match(')');
+        AST *Tree=blockdef();
+        return Tree;
+    }
+    AST* blockdef(){
+        Position pos=lookahead().pos;
+        match('{');vector<AST*> Trees;
+        stmtdef(Trees);
+        match('}');
+        return new Block(pos,Trees);
+    }
+    AST* stmtdef(vector<AST*> &Tree){
+        switch(lookahead().type){
+            case IDENT:
+            case NUMBER:
+            case '(':
+            case '+':
+            case '!':
+            case '-':
+            case FOR:
+            case IF:
+            case RETURN:
+            case WHILE:
+            case INT:
+                Tree.push_back(stmtdef());
+                stmtdef(Tree);
+                break;
+
+        }
+    }
+    AST* stmtdef(){
+        Position pos=lookahead().pos;
+        vector<Var> vars;
+        vector<AST*> Trees;
+        AST* Tree;
+        switch(lookahead().type){
+            case IF:
+                return ifdef();
+            case WHILE:
+                return whiledef();
+            case FOR:
+                return fordef();
+            case RETURN:
+                return returndef();
+            case INT:
+                match(INT);
+                vardef(vars);
+                varsdef(vars);
+                match(';');
+               return new VarDefiniton(pos,vars);
+            case '{':
+                match('{');
+                stmtdef(Trees);
+                match('}');
+                return new Block(pos,Trees);
+            case ':':
+                match(';');
+                return nullptr;
+            default:
+                Tree=exprdef();
+                match(';');
+                return Tree;
+        }
+
+    }
+
+    AST* ifdef(){
+        assert(lookahead().type==IF);
+        Position pos=lookahead().pos;
+        match(IF);match('(');
+        AST *a=exprdef();
+        match(')');
+        AST *b=stmtdef();
+        if(lookahead().type==ELSE){
+            match(ELSE);
+            return new If(pos,a,b,stmtdef());
+        }
+        return new If(pos,a,b);
+    }
+
+    AST* fordef(){
+        Position pos=lookahead().pos;
+        match(FOR);match('(');
+        AST* init=forstmt();match(';');
+        AST *expr=expropt();match(';');
+        AST *delta=expropt();match(')');
+        return new For(pos,init,expr,delta,stmtdef());
+    }
+
+    AST *forstmt(){
+        AST* Tree;vector<Var> vars;
+        Position pos=lookahead().pos;
+        switch(lookahead().type){
+            case IDENT:
+            case NUMBER:
+            case '(':
+            case '+':
+            case '!':
+            case '-':
+                return expropt();
+            case INT:
+                match(INT);
+                vardef(vars);
+                varsdef(vars);
+                return new VarDefiniton(pos,vars);
+        }
+        return nullptr;
+    }
+    AST* expropt(){
+        Position pos=lookahead().pos;
+        switch(lookahead().type){
+            case IDENT:
+            case NUMBER:
+            case '(':
+            case '+':
+            case '!':
+            case '-':
+                return expropt();
+            default:
+                return new Ident(pos,1);
+        }
+    }
+    void vardef(const string &name,vector<Var> &opt){
+        vector<int> indexs;
+        if(lookahead().type=='['){
+            arrayidx(indexs);
+            opt.push_back(Var("array",name,indexs));
+        }
+        else opt.push_back(Var("int",name));
+    }
+    AST *whiledef(){
+        Position pos=lookahead().pos;
+        match(WHILE);match('(');
+        AST* expr=exprdef();match(')');
+        return new While(pos,expr,stmtdef());
+    }
+
+    AST *returndef(){
+        Position pos=lookahead().pos;
+        match(RETURN);
+        AST* expr=exprdef();match(';');
+        return new Return(pos,expr);
+    }
+
+    void vardef(vector<Var> &opt){
+        vector<int> indexs;string name;
+        if(lookahead().type==IDENT){
+            name=lookahead().ident;
+            match(IDENT);
+            vardef(name,opt);
+        }
+    }
+    void arrayidx(vector<int> &indexs){
+        int id;
+        if(lookahead().type=='['){
+            match('[');
+            id=lookahead().number;
+            match(NUMBER);
+            indexs.push_back(id);match(']');
+            arrayidx(indexs);
+        }
+    }
+    void arrayidxexpr(vector<AST*> &indexs){
+        if(lookahead().type=='['){
+            match('[');indexs.push_back(exprdef());
+            match(']');
+            arrayidxexpr(indexs);
+        }
+    }
+    void varsdef(vector<Var> &opt){
+        if(lookahead().type==','){
+            match(',');
+            vardef(opt);varsdef(opt);
+        }        
+    }
+    AST* exprdef(){
+        Position pos=lookahead().pos;
+        return lv9();
+    }
+    
+    AST* leftval(){
+        Position pos=lookahead().pos;
+        string name=lookahead().ident;
+        match(IDENT);
+        vector<AST*> Trees;AST* Tree;
+        if(lookahead().type=='['){
+            arrayidxexpr(Trees);
+            return new ArrayOpt(pos,name,Trees);
+        }
+        else return new Ident(pos,name);
+    }
+    
+    AST* lv0ident(){
+        Position pos=lookahead().pos;string name=lookahead().ident;
+        match(IDENT);
+        vector<AST*> Trees;AST* Tree;
+        switch (lookahead().type)
+        {
+        case '[':
+            arrayidxexpr(Trees);
+            return new ArrayOpt(pos,name,Trees);
+            break;
+        case '(':
+            match('(');calc(Trees);match(')');
+            return new Exec(pos,name,Trees);
+        
+        default:
+            return new Ident(pos,name);
+            break;
+        }
+    }
+    AST* lv0(){
+        Position pos=lookahead().pos;AST* Tree;int data;
+        switch (lookahead().type)
+        {
+        case '(':
+            match('(');Tree=exprdef();match(')');return Tree;
+            break;
+        case NUMBER:
+            data=lookahead().number;
+            match(NUMBER);
+            return new Ident(pos,data);
+            break;
+        case IDENT:
+            return lv0ident();
+        
+        default:
+            report.issue(SyntexError(pos));
+            break;
+        }
+    }
+
+    AST *lv1(){
+        Position pos=lookahead().pos;
+        switch (lookahead().type)
+        {
+        case '!':
+            match('!');
+            return new BinaryOpt(pos,'!',"!",(AST*)new Ident(pos,0),lv1());
+            break;
+        case '+':
+            match('+');
+            return new BinaryOpt(pos,'+',"+",(AST*)new Ident(pos,0),lv1());
+            break;
+        case '-':
+            match('-');
+            return new BinaryOpt(pos,'-',"-",(AST*)new Ident(pos,0),lv1());
+            break;
+        
+        default:
+            return lv0();
+            break;
+        }
+    }
+
+    AST* lv2(){
+        AST *ls=lv1();
+        while(true){
+            Position pos=lookahead().pos;
+            switch(lookahead().type){
+                case '*':
+                    match('*');
+                    ls=new BinaryOpt(pos,'*',"*",ls,lv1());
+                    break;
+                case '/':
+                    match('/');
+                    ls=new BinaryOpt(pos,'/',"/",ls,lv1());
+                    break;
+                case '%':
+                    match('%');
+                    ls=new BinaryOpt(pos,'%',"%",ls,lv1());
+                    break;
+                default:
+                    return ls;
+            }
+        }
+    }
+
+    AST* lv3(){
+        AST* ls=lv2();
+        while(true){
+            Position pos=lookahead().pos;
+            switch(lookahead().type){
+                case '+':
+                    match('+');
+                    ls=new BinaryOpt(pos,'+',"+",ls,lv2());
+                    break;
+                case '-':
+                    match('-');
+                    ls=new BinaryOpt(pos,'-',"-",ls,lv2());
+                    break;
+                default:
+                    return ls;
+            }
+        }
+    }
+
+    AST* lv4(){
+        AST *ls=lv3();
+        while(true){
+            Position pos=lookahead().pos;
+            switch(lookahead().type){
+                case '<':
+                    match('<');
+                    ls=new BinaryOpt(pos,'<',"<",ls,lv3());
+                    break;
+                case '>':
+                    match('>');
+                    ls=new BinaryOpt(pos,'>',">",ls,lv3());
+                    break;
+                case L_LEQ:
+                    match(L_LEQ);
+                    ls=new BinaryOpt(pos,L_LEQ,"<=",ls,lv3());
+                    break;
+                case L_REQ:
+                    match(L_REQ);
+                    ls=new BinaryOpt(pos,L_REQ,">=",ls,lv3());
+                    break;
+                default:
+                    return ls;
+            }
+        }
+    }
+
+    AST *lv5(){
+        AST *ls=lv4();
+        while(true){
+            Position pos=lookahead().pos;
+            switch(lookahead().type){
+                case L_EQ:
+                    match(L_EQ);
+                    ls=new BinaryOpt(pos,L_EQ,"==",ls,lv4());
+                    break;
+                case L_NEQ:
+                    match(L_NEQ);
+                    ls=new BinaryOpt(pos,L_NEQ,"==",ls,lv4());
+                    break;
+                default:
+                    return ls;  
+            }
+        }
+    }
+
+    AST* lv6(){
+        AST *ls=lv5();
+        while(true){
+            Position pos=lookahead().pos;
+            switch(lookahead().type){
+                case '^':
+                    match('^');
+                    ls=new BinaryOpt(pos,'^',"^",ls,lv5());
+                    break;
+                default:
+                    return ls;
+            }
+        }
+    }
+
+    AST *lv7(){
+        AST *ls=lv6();
+        while(true){
+            Position pos=lookahead().pos;
+            switch(lookahead().type){
+                case L_AND:
+                    match(L_AND);
+                    ls=new BinaryOpt(pos,L_AND,"&&",ls,lv6());
+                    break;
+                default:
+                    return ls;
+            }
+        }
+    }
+
+    AST *lv8(){
+        AST *ls=lv7();
+        while(true){
+            Position pos=lookahead().pos;
+            switch(lookahead().type){
+                case L_OR:
+                    match(L_OR);
+                    ls=new BinaryOpt(pos,L_OR,"||",ls,lv7());
+                    break;
+                default:
+                    return ls;
+            }
+        }
+    }
+
+    AST *lv9(){
+        AST *rs=lv8();Position pos=lookahead().pos;
+        while(true){
+            switch (lookahead().type){
+                case '=':
+                    match('=');
+                    rs=new BinaryOpt(pos,'=',"=",rs,lv8());
+                    break;
+                default:
+                    return rs;
+            }
+        }
+    }
+
+    void calc(vector<AST*> exprs){
+        Position pos=lookahead().pos;
+        switch(lookahead().type){
+		case ')':
+			break;
+			case IDENT:
+            case NUMBER:
+            case '(':
+            case '+':
+            case '!':
+            case '-':
+				exprs.push_back(exprdef());
+			switch(lookahead().type){
+			case ',':
+				match(',');
+				break;
+			case ')':
+				break;
+			default:
+				report.issue(SyntexError(pos));
+			}
+			calc(exprs);
+			break;
+		default:
+			report.issue(SyntexError(pos));
+		}
+    }
+
+
+    parser(){pre=0;}
+    ~parser(){if(program!=nullptr)delete(program);}
+
+    int main(){
+        lexer.begin();
+        token cur;
+        do{
+            cur=lexer.readtoken();
+            tokens.push_back(cur);
+            //cur.output(); 
+        }
+        while(cur.type!=EOF);
+        if(lexer.iserror())exit(0);
+        program=head();
+        program->visit(typevisitor);
+        if(typevisitor.iserror()){
+            cerr<<"error"<<endl;
+            exit(0);
+        }
+        program->visit(runvisitor);
+    }
+
+
+}parser_;
