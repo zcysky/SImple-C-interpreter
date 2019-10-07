@@ -19,6 +19,7 @@ const int IF=WHILE-1;
 const int ELSE=IF-1;
 const int RETURN=ELSE-1;
 
+
 //逻辑运算符
 const int L_EQ=RETURN-1;
 const int L_LEQ=L_EQ-1;
@@ -31,6 +32,14 @@ const int L_OR=L_AND-1;
 const int ERROR=L_OR-1;
 const int EXIT=ERROR-1;
 const int COMMENT=EXIT-1;
+const int SHIFTL=COMMENT-1;
+const int SHIFTR=SHIFTL-1;
+
+//输入输出部分
+const int CIN=SHIFTR-1;
+const int COUT=CIN-1;
+const int PUTCHAR=COUT-1;
+const int ENDL=PUTCHAR-1;
 
 
 //定义运算符号
@@ -57,3 +66,10 @@ const int LESS='<';
 const int GREAT='>';
 
 #define dbg(x) cout<<#x<<' = '<<(x)<<endl;
+
+inline int read(){
+    int f=1,x=0;char ch;
+    do{ch=getchar();if(ch=='-')f=-1;}while(ch<'0'||ch>'9');
+    do{x=x*10+ch-'0';ch=getchar();}while(ch>='0'&&ch<='9');
+    return f*x;
+}

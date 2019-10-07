@@ -6,7 +6,7 @@
 
 int main(){
     lexer.init();
-    freopen("source.cpp");
+    freopen("source.cpp","r",stdin);
     lexer.begin();
     parser_.main();
     return 0;

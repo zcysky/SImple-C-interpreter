@@ -1,7 +1,3 @@
-#include "debugger.cpp"
-#include "header.cpp"
-#include "reporterror.cpp"
-
 class token{
     public:
     Position pos;//追踪位置，用于报错

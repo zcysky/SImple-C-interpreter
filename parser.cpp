@@ -13,6 +13,10 @@ class ArrayOpt;
 class Exec;
 class Expr;
 
+class CinOpt;
+class CoutOpt;
+class Putchar;
+
 
 class visitor{
 
@@ -30,6 +34,10 @@ class visitor{
     virtual void VisitReturn(Return *that){}
     virtual void VisitArrayOpt(ArrayOpt *that){}
     virtual void VisitExec(Exec *that){}
+
+    virtual void VisitCinOpt(CinOpt *that){}
+    virtual void VisitCoutOpt(CoutOpt *that){}
+    virtual void VisitPutchar(Putchar *that){}
 
 };
 
@@ -102,7 +110,7 @@ class Var{
     inline void print(int tab){
         for(int i=1;i<=tab;i++)putchar(' ');
         cout<<type<<" "<<name<<endl;
-        if(type=="array")for(int i=0;i<indexs.size();i++)cout<<name<<"["<<indexs[i]<<"] ";
+        if(type=="array")for(int i=0;i<indexs.size();i++)cout<<"["<<indexs[i]<<"] ";
     }
 
     
@@ -275,7 +283,7 @@ class ArrayOpt:public Expr{
     int idscope,insocope;
     vector<AST*> at;
     Var var;
-    ArrayOpt(const Position &pos,const string &name,const vector<AST*> at){
+    ArrayOpt(const Position &pos,const string &name,const vector<AST*> &at){
         setpos(pos);
         this->name=name;this->at=at;
     }
@@ -425,6 +433,62 @@ class Return:public AST{
 };
 
 
+class CinOpt:public Expr{
+
+    public:
+    vector<AST*> vars;
+    CinOpt(const Position &pos,const vector<AST*> &vars){
+        setpos(pos);this->vars=vars;
+    }
+    virtual ~CinOpt(){}
+    virtual void visit(visitor &vis){vis.VisitCinOpt(this);}
+    virtual void print(int tab){
+        for(int i=1;i<=tab;i++)putchar(' ');
+        puts("cin:");
+        for(int i=0;i<vars.size();i++)vars[i]->print(tab+2);
+    }
+
+};
+
+class CoutOpt:public Expr{
+
+    public:
+
+    vector<AST*> vars;
+    CoutOpt(const Position &pos,const vector<AST*> &vars){
+        setpos(pos);this->vars=vars;
+    }
+    virtual ~CoutOpt(){
+        for(int i=0;i<vars.size();i++)if(vars[i]!=nullptr)delete(vars[i]);
+    }
+    virtual void visit(visitor &vis){vis.VisitCoutOpt(this);}
+    virtual void print(int tab){
+        for(int i=1;i<=tab;i++)putchar(' ');
+        puts("cout:");
+        for(int i=0;i<vars.size();i++)vars[i]->print(tab+2);
+    }
+
+};
+
+class Putchar:public AST{
+
+    public:
+    AST *expr;
+    Putchar(const Position &pos,AST* Tree){
+        setpos(pos);this->expr=Tree;
+    }
+    virtual ~Putchar(){
+        if(expr!=nullptr)delete(expr);
+    }
+    virtual void visit(visitor &vis){vis.VisitPutchar(this);}
+    virtual void print(int tab){
+        for(int i=1;i<=tab;i++)putchar(' ');
+        puts("putchar:");
+        if(expr!=nullptr)expr->print(tab+2);
+    }
+
+};
+
 //scope部分
 
 const int GLOBAL=-2;
@@ -442,7 +506,7 @@ class Scope{
         return table[s];
     }
     inline int create(const string &s,const T &var,int len=1){
-        assert(!table.count(s));
+        assert(!count(s));
         table[s]=make_pair(var,id);
         id+=len;
         return id-len;
@@ -608,6 +672,17 @@ class TypeVisitor:public visitor{
         return report.haserror();
     }
     inline int size(){return stack.topsize();}
+
+
+    virtual void VisitCinOpt(CinOpt *that){
+        for(int i=0;i<that->vars.size();i++)that->vars[i]->visit(*this);
+    }
+    virtual void VisitCoutOpt(CoutOpt *that){
+        for(int i=0;i<that->vars.size();i++)that->vars[i]->visit(*this);
+    }
+    virtual void VisitPutChar(Putchar *that){
+        that->expr->visit(*this);
+    }
 
 }typevisitor;
 
@@ -814,6 +889,28 @@ class runvisitor:public visitor{
         tope().flag=1;
         tope().ret=value.ret;
     }
+    virtual void VisitCinOpt(CinOpt *that){
+        if(!stack.empty()&&tope().flag)return;
+        for(int i=0;i<that->vars.size();i++){
+            that->vars[i]->visit(*this);
+            pool[value.pos]=read();
+        }
+        value=SemiValue(0,-1);
+    }
+    virtual void visitCoutOpt(CoutOpt *that){
+        if(!stack.empty()&&tope().flag)return;
+        for(int i=0;i<that->vars.size();i++){
+            that->vars[i]->visit(*this);
+            if(value.pos==-2)puts("");
+            else printf("%d ",value.ret);
+        }
+        value=SemiValue(0,-1);
+    }
+    virtual void VisitPutChar(Putchar *that){
+        if(!stack.empty()&&tope().flag)return;
+        that->expr->visit(*this);
+        printf("%c ",value.ret);
+    }
 
 }runvisitor;
 
@@ -923,6 +1020,8 @@ class parser{
             case '!':
             case '-':
             case FOR:
+            case CIN:
+            case COUT:
             case IF:
             case RETURN:
             case WHILE:
@@ -1001,6 +1100,8 @@ class parser{
             case '(':
             case '+':
             case '!':
+            case CIN:
+            case COUT:
             case '-':
                 return expropt();
             case INT:
@@ -1016,6 +1117,8 @@ class parser{
         switch(lookahead().type){
             case IDENT:
             case NUMBER:
+            case CIN:
+            case COUT:
             case '(':
             case '+':
             case '!':
@@ -1080,7 +1183,41 @@ class parser{
     }
     AST* exprdef(){
         Position pos=lookahead().pos;
-        return lv9();
+        vector<AST*> exprs;
+        switch (lookahead().type){
+        case COUT:
+            match(COUT);match(SHIFTL);
+            coutopt(exprs);
+            return new CoutOpt(pos,exprs);
+            break;
+        case CIN:
+            match(CIN);match(SHIFTR);
+            cinopt(exprs);
+            return new CinOpt(pos,exprs);
+            break;
+        
+        default:
+            return lv9();
+            break;
+        }
+        
+    }
+
+    void cinopt(vector<AST*> &vars){
+        vars.push_back(leftval());
+        switch(lookahead().type){
+            case SHIFTR:
+                match(SHIFTR);
+                cinopt(vars);
+        }
+    }
+    void coutopt(vector<AST*> &vars){
+        vars.push_back(exprdef());
+        switch(lookahead().type){
+            case SHIFTL:
+                match(SHIFTL);
+                coutopt(vars);
+        }
     }
     
     AST* leftval(){
@@ -1108,7 +1245,7 @@ class parser{
         case '(':
             match('(');calc(Trees);match(')');
             return new Exec(pos,name,Trees);
-        
+            break;
         default:
             return new Ident(pos,name);
             break;
@@ -1128,7 +1265,10 @@ class parser{
             break;
         case IDENT:
             return lv0ident();
-        
+            break;
+        case ENDL:
+            match(ENDL);
+            return new Ident(pos,ENDL,'\n');
         default:
             report.issue(SyntexError(pos));
             break;
@@ -1312,6 +1452,8 @@ class parser{
 			break;
 			case IDENT:
             case NUMBER:
+            case CIN:
+            case COUT:
             case '(':
             case '+':
             case '!':
@@ -1343,9 +1485,9 @@ class parser{
         do{
             cur=lexer.readtoken();
             tokens.push_back(cur);
-            //cur.output(); 
+            cur.output(); 
         }
-        while(cur.type!=EOF);
+        while(cur.type!=EXIT);
         if(lexer.iserror())exit(0);
         program=head();
         program->visit(typevisitor);
