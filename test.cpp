@@ -338,7 +338,8 @@ class lexer{
         else return 0;
     }
     inline void skipblank(){
-        do{readchar();}while(isblank(ch));
+        //assert(isblank(ch));
+        while(isblank(ch))readchar();
     }
     inline token readnumber(){
         assert(isdigit(ch));
@@ -1933,9 +1934,11 @@ class parser{
             cur.output(); 
         }
         while(cur.type!=EXIT);
+        //cerr<<"!!!!"<<endl;
         if(lexer.iserror())exit(0);
         program=head();
         program->visit(typevisitor);
+        
         if(typevisitor.iserror()){
             cerr<<"error"<<endl;
             exit(0);
@@ -1954,5 +1957,6 @@ int main(){
     freopen("source.cpp","r",stdin);;
     lexer.begin();
     parser_.main();
+    system("PAUSE");
     return 0;
 }

@@ -1,7 +1,5 @@
-#include<iostream>
-#include<cstdio>
-using namespace std;
 int main(){
-    int a;
-    for(int i=1;i<=10;i++)a=a+i;
+    int a,i;
+    for(i=1;i<=10;i++)a=a+i;
+    //b=10;
 }
